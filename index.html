@@ -665,11 +665,47 @@
   .key-dot:hover .key-tip,
   .voiced-key-active:hover .key-tip { opacity: 1; }
 
+  .scale-bar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 28px;
+    background: var(--bg);
+    border-bottom: 1px solid var(--dim);
+    flex-wrap: wrap;
+  }
+
+  .scale-bar-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-right: 4px;
+  }
+
+  .scale-note {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    color: var(--text);
+    background: var(--card);
+    border: 1px solid var(--dim);
+    border-radius: 3px;
+    padding: 3px 9px;
+    letter-spacing: 1px;
+  }
+
+  .scale-note.root {
+    color: var(--accent);
+    border-color: var(--accent);
+  }
+
   @media (max-width: 700px) {
     .chord-row { grid-template-columns: 50px repeat(4, 1fr); }
     .detail-inner { grid-template-columns: 1fr; }
     .controls { gap: 8px; }
     .main { padding: 14px; }
+    .scale-bar { padding: 8px 14px; }
   }
 </style>
 </head>
@@ -688,6 +724,10 @@
     <button class="mode-btn active" onclick="setMode('major',this)">MAJOR</button>
     <button class="mode-btn" onclick="setMode('minor',this)">MINOR</button>
   </div>
+</div>
+
+<div class="scale-bar" id="scaleBar">
+  <span class="scale-bar-label">NOTES</span>
 </div>
 
 <div class="main">
@@ -2044,6 +2084,7 @@ function switchKey(newKey) {
   clearProg();
   closeDetail();
   renderAll();
+  renderScaleBar();
   restoreSnapshot(progressionSnapshot, currentKey);
 }
 
@@ -2058,6 +2099,7 @@ function switchMode(newMode, btn) {
   clearProg();
   closeDetail();
   renderAll();
+  renderScaleBar();
   restoreSnapshot(progressionSnapshot, currentKey);
 }
 
@@ -2310,9 +2352,18 @@ function loadProgression(data, saveKey) {
   document.getElementById('progSlots').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
+// ── SCALE BAR ──
+function renderScaleBar() {
+  const notes = getScaleNotes(currentKey, currentMode);
+  const bar = document.getElementById('scaleBar');
+  bar.innerHTML = '<span class="scale-bar-label">NOTES</span>'
+    + notes.map(n => `<span class="scale-note${n === currentKey ? ' root' : ''}">${n}</span>`).join('');
+}
+
 // ── INIT ──
 buildKeySelector();
 renderAll();
+renderScaleBar();
 renderSaved();
 </script>
 </body>
