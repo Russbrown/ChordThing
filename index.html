@@ -697,12 +697,62 @@
     .main { padding: 14px; }
     .scale-bar { padding: 10px 14px; }
   }
+
+  /* ── MIDI CONTROLS ── */
+  .midi-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .midi-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: var(--muted);
+    text-transform: uppercase;
+  }
+
+  .midi-select {
+    background: var(--card);
+    border: 1px solid var(--dim);
+    color: var(--muted);
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    padding: 5px 8px;
+    border-radius: 3px;
+    cursor: pointer;
+    max-width: 180px;
+    outline: none;
+  }
+
+  .midi-select:focus { border-color: var(--accent); }
+  .midi-select.connected { border-color: var(--accent2); color: var(--accent2); }
+
+  .midi-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--dim);
+    flex-shrink: 0;
+    transition: background 0.2s;
+  }
+
+  .midi-dot.active { background: var(--accent2); box-shadow: 0 0 4px var(--accent2); }
+  .midi-unsupported { font-family: 'Space Mono', monospace; font-size: 10px; color: var(--muted); letter-spacing: 1px; }
 </style>
 </head>
 <body>
 
 <header>
   <div class="logo">CHORD FILES</div>
+  <div class="midi-controls" id="midiControls">
+    <div class="midi-dot" id="midiDot"></div>
+    <span class="midi-label">MIDI</span>
+    <select class="midi-select" id="midiSelect" onchange="selectMIDIOutput(this.value)">
+      <option value="">— off —</option>
+    </select>
+  </div>
 </header>
 
 
@@ -1176,6 +1226,66 @@ function playChord(chordNotes, rootNote, quality, voicing) {
     const strum = i * 0.028;
     const vol = i === 0 ? 0.42 : 0.36 / Math.sqrt(numNotes);
     playNote(ctx, freq, now + strum, duration, vol);
+  });
+
+  sendMIDIChord(voiced, duration);
+}
+
+// ── WEB MIDI ──
+let midiAccess = null;
+let midiOut = null;
+
+function initMIDI() {
+  if (!navigator.requestMIDIAccess) {
+    const ctrl = document.getElementById('midiControls');
+    ctrl.innerHTML = '<span class="midi-unsupported">MIDI: USE CHROME</span>';
+    return;
+  }
+  navigator.requestMIDIAccess().then(access => {
+    midiAccess = access;
+    midiAccess.onstatechange = populateMIDIOutputs;
+    populateMIDIOutputs();
+  }).catch(() => {
+    document.getElementById('midiDot').style.background = '#8a4a4a';
+  });
+}
+
+function populateMIDIOutputs() {
+  const sel = document.getElementById('midiSelect');
+  const prevId = sel.value;
+  sel.innerHTML = '<option value="">— off —</option>';
+  for (const output of midiAccess.outputs.values()) {
+    const opt = document.createElement('option');
+    opt.value = output.id;
+    opt.textContent = output.name;
+    sel.appendChild(opt);
+  }
+  // Restore previous selection if still available
+  if (prevId && midiAccess.outputs.has(prevId)) {
+    sel.value = prevId;
+  }
+  selectMIDIOutput(sel.value);
+}
+
+function selectMIDIOutput(id) {
+  midiOut = (id && midiAccess) ? midiAccess.outputs.get(id) : null;
+  const dot = document.getElementById('midiDot');
+  const sel = document.getElementById('midiSelect');
+  dot.classList.toggle('active', !!midiOut);
+  sel.classList.toggle('connected', !!midiOut);
+}
+
+function sendMIDIChord(voicedNotes, durationSec = 2.5) {
+  if (!midiOut) return;
+  const CH = 0; // channel 1
+  const velocity = 100;
+  const durationMs = durationSec * 1000;
+  voicedNotes.forEach((n, i) => {
+    const strumMs = i * 28;
+    setTimeout(() => {
+      midiOut.send([0x90 | CH, n.midi, velocity]);
+      setTimeout(() => midiOut.send([0x80 | CH, n.midi, 0]), durationMs);
+    }, strumMs);
   });
 }
 
@@ -2355,6 +2465,7 @@ buildKeySelector();
 renderAll();
 renderScaleBar();
 renderSaved();
+initMIDI();
 </script>
 </body>
 </html>
